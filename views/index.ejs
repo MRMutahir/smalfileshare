@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time File Sharing</title>
+</head>
+
+<body>
+    <input type="file" id="fileInput" />
+    <button onclick="sendFile()">Send File</button>
+
+    <div id="fileList"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let userId;
+
+        // Receive the user ID from the server
+        socket.on('userId', (id) => {
+            userId = id;
+            console.log(`Your user ID: ${userId}`);
+        });
+
+        function sendFile() {
+            const fileInput = document.getElementById('fileInput');
+            const recipientUserId = prompt('Enter recipient user ID:');
+
+            if (fileInput.files.length > 0 && recipientUserId) {
+                const file = fileInput.files[0];
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const fileContent = e.target.result;
+                    const fileName = file.name;
+
+                    // Emit the file content, sender's user ID, and recipient's user ID to the server
+                    socket.emit('file', { fileName, fileContent, recipientUserId });
+                };
+
+                reader.readAsDataURL(file);
+            }
+        }
+
+        socket.on('file', (fileData) => {
+            console.log(`Received file from user ${fileData.senderUserId}: ${fileData.fileName}`);
+
+            const blob = base64ToBlob(fileData.fileContent);
+            const dataUrl = URL.createObjectURL(blob);
+
+            const downloadLink = document.createElement('a');
+            downloadLink.href = dataUrl;
+            downloadLink.download = fileData.fileName;
+            downloadLink.textContent = `Download from user ${fileData.senderUserId}: ${fileData.fileName}`;
+
+            const fileList = document.getElementById('fileList');
+            fileList.appendChild(downloadLink);
+            fileList.appendChild(document.createElement('br'));
+        });
+
+        function base64ToBlob(base64Data) {
+            const byteString = atob(base64Data.split(',')[1]);
+            const mimeString = base64Data.split(',')[0].split(':')[1].split(';')[0];
+
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            return new Blob([ab], { type: mimeString });
+        }
+    </script>
+</body>
+
+</html>
